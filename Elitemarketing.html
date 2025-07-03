@@ -1,0 +1,1282 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asistente Virtual LinkBot</title>
+    <style>
+        /* Variables CSS para colores */
+        :root {
+            --tertiary-color: #2ECC71; /* Verde menta */
+            --quaternary-color: #2C5F9B; /* CAMBIO: Azul más profundo para botones de formulario/solicitud */
+            --background-color: #F8F9FA; /* CAMBIO: Fondo muy claro, casi blanco */
+            --bot-message-bg: #E0E7FF; /* Fondo mensaje bot - Azul claro para combinar con el degradado */
+            --user-message-bg: #3C77FC; /* Fondo mensaje usuario - Azul primario */
+            --text-dark: #4A2E1F; /* Texto oscuro */
+            --text-light: #FFFFFF; /* Texto claro */
+
+            /* Variables para degradado azul/morado */
+            --primary-gradient-start: #3C77FC; /* Azul */
+            --primary-gradient-end: #7545FD; /* Morado */
+
+            /* Colores para botones de acción específicos */
+            --buy-button-bg: #2C3E50; /* Negro azulado */
+            --buy-button-text: #FFFFFF;
+            --buy-button-hover-bg: #1A242E;
+
+            /* NUEVAS VARIABLES PARA BOTONES DE RETORNO */
+            --return-button-bg: #FFFFFF; /* Fondo blanco para botones de retorno */
+            --return-button-text: var(--primary-gradient-start); /* Texto azul/morado para contraste */
+            --return-button-border: 1px solid var(--primary-gradient-start); /* Borde para que se vea el botón blanco */
+            --return-button-hover-bg: #F0F0F0; /* Un gris muy claro para el hover */
+        }
+
+        /* Estilos generales del body, sin pointer-events: none aquí */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: var(--background-color);
+            /* Aseguramos que el body no tenga scrollbars si no hay contenido */
+            overflow: hidden;
+            height: 100vh; /* Ocupa toda la altura de la ventana */
+            width: 100vw; /* Ocupa todo el ancho de la ventana */
+        }
+
+        /* Clase para deshabilitar interacciones cuando el chatbot está cerrado */
+        body.chatbot-closed-state {
+            pointer-events: none; /* Deshabilita interacciones en todo el body */
+        }
+
+        /* Reactiva solo el icono del chatbot cuando el body tiene la clase chatbot-closed-state */
+        body.chatbot-closed-state #chatbot-icon-container,
+        body.chatbot-closed-state #chatbot-icon,
+        body.chatbot-closed-state #chatbot-icon * {
+            pointer-events: auto !important;
+        }
+
+        /* Contenedor principal del chatbot */
+        #chatbot-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 350px; /* Modificado de 320px a 350px para PC */
+            height: 500px;
+            border-radius: 12px;
+            box-shadow: 0 5px 30px rgba(0, 0, 0, 0.15);
+            display: flex;
+            flex-direction: column;
+            background-color: var(--text-light);
+            overflow: hidden;
+            z-index: 1000;
+            transition: opacity 0.3s ease; /* Solo opacidad para una aparición suave */
+            opacity: 0;
+            border: 1px solid var(--primary-gradient-start); /* Borde del contenedor ahora azul/morado */
+            /* Aseguramos que el chatbot sea interactivo cuando está activo */
+            pointer-events: none; /* Por defecto no interactivo cuando está oculto */
+        }
+
+        /* Estado activo del contenedor (visible) */
+        #chatbot-container.active {
+            opacity: 1;
+            pointer-events: auto; /* Reactiva interacciones cuando está visible */
+        }
+
+        /* Encabezado del chatbot */
+        #chatbot-header {
+            background: linear-gradient(135deg, var(--primary-gradient-start), var(--primary-gradient-end));
+            color: var(--text-light); /* Cambiado a texto claro para contraste con el degradado */
+            padding: 15px 20px;
+            font-weight: 600;
+            display: flex;
+            gap: 8px; /* Ajuste el espacio entre elementos */
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* Estilos para el grupo de título en el encabezado (icono + texto + luz) */
+        #chatbot-header .header-title-group {
+            display: flex;
+            align-items: center;
+            gap: 6px; /* Ajustado el espacio para acercar el icono y LinkBot */
+        }
+
+        /* Icono del robot en la cabecera (SVG) */
+        #chatbot-header .header-bot-icon-svg {
+            display: block;
+            height: 30px;
+            width: 30px;
+            object-fit: contain;
+            transform: translateY(-2px);
+            /* filter: brightness(0) invert(1);  Eliminado para que el icono mantenga su color original si no es blanco */
+        }
+
+        /* Indicador de estado "en línea" (punto verde) */
+        .online-indicator {
+            width: 10px;
+            height: 10px;
+            background-color: var(--tertiary-color); /* Usando el verde menta */
+            border-radius: 50%;
+            display: inline-block;
+            animation: blink 1.5s infinite;
+            flex-shrink: 0; /* Evita que el punto se encoja */
+            margin-left: 6px;
+        }
+
+        /* Animación de parpadeo para el indicador */
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* Botón para cerrar el chatbot */
+        #chatbot-close {
+            background: rgba(255, 255, 255, 0.2); /* Fondo más claro para contraste */
+            border: none;
+            outline: none;
+            -webkit-tap-highlight-color: transparent;
+            color: var(--text-light); /* Texto claro */
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            line-height: 1;
+        }
+
+        #chatbot-close:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Área de mensajes */
+        #chatbot-messages {
+            flex-grow: 1;
+            padding: 15px;
+            overflow-y: auto;
+            background-color: var(--background-color); /* Fondo del área de mensajes */
+            display: flex;
+            flex-direction: column;
+            border-bottom: 1px solid #F0DDCF; /* Borde inferior */
+            scroll-behavior: smooth;
+            overscroll-behavior: contain;
+            scroll-snap-type: y proximity;
+        }
+
+        /* Estilos generales para cada mensaje */
+        .message {
+            margin-bottom: 12px;
+            padding: 10px 15px;
+            scroll-margin-top: 20px;
+            scroll-snap-align: start;
+            border-radius: 18px;
+            max-width: 80%;
+            word-wrap: break-word;
+            line-height: 1.4;
+            position: relative;
+            animation: fadeIn 0.3s ease;
+            font-size: 14px; /* Tamaño base para todos los mensajes */
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Animación de aparición */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Mensajes del bot */
+        .bot-message {
+            background-color: var(--bot-message-bg); /* Nuevo color de fondo para mensajes del bot */
+            color: var(--text-dark);
+            align-self: flex-start;
+            border-bottom-left-radius: 5px;
+            text-align: left;
+        }
+
+        /* Mensajes del usuario */
+        .user-message {
+            background-color: var(--user-message-bg); /* Nuevo color de fondo para mensajes del usuario */
+            color: var(--text-light);
+            align-self: flex-end;
+            border-bottom-right-radius: 5px;
+            text-align: left; /* Alinea el texto a la izquierda dentro de la burbuja del usuario */
+        }
+
+        /* Marca de tiempo del mensaje */
+        .message-time {
+            display: block;
+            font-size: 10px; /* Tamaño de la hora ajustado para ser legible */
+            opacity: 0.7;
+            margin-top: 4px;
+            text-align: right;
+            color: var(--text-dark); /* Color del texto de la hora */
+        }
+        .user-message .message-time {
+            color: var(--text-light);
+        }
+
+        /* Animación de puntos suspensivos para "escribiendo..." */
+        .typing-animation span {
+            animation: blink-dots 1s infinite steps(1);
+        }
+
+        .typing-animation span:nth-child(1) { animation-delay: 0s; }
+        .typing-animation span:nth-child(2) { animation-delay: 0.33s; }
+        .typing-animation span:nth-child(3) { animation-delay: 0.66s; }
+
+        @keyframes blink-dots {
+            0% { opacity: 0; }
+            50% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        /* Contenedor de entrada de texto */
+        #chatbot-input-container {
+            display: flex;
+            padding: 12px;
+            border-top: 1px solid #eee; /* Mantenido el gris claro para la línea de separación */
+            background-color: var(--text-light);
+        }
+
+        /* Campo de entrada */
+        #chatbot-input-field {
+            flex-grow: 1;
+            padding: 12px 15px;
+            border: 1px solid #ddd; /* Mantenido el gris claro */
+            border-radius: 24px;
+            outline: none;
+            font-size: 14px; /* Aumentado el tamaño de la fuente para el campo de entrada */
+            transition: all 0.2s ease;
+        }
+
+        #chatbot-input-field:focus {
+            border-color: var(--primary-gradient-start);
+            box-shadow: 0 0 0 2px rgba(60, 119, 252, 0.2); /* Sombra con el color primario */
+        }
+
+        /* Botón de enviar */
+        #chatbot-send {
+            background: linear-gradient(135deg, var(--primary-gradient-start), var(--primary-gradient-end));
+            color: var(--text-light); /* Cambiado a texto claro */
+            border: none;
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            margin-left: 10px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(60, 119, 252, 0.25);
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #chatbot-send:hover {
+            background: linear-gradient(135deg, var(--primary-gradient-end), #5C35D0); /* Un tono más oscuro para el hover */
+            transform: scale(1.1);
+            box-shadow: 0 6px 16px rgba(60, 119, 252, 0.3);
+        }
+
+        #chatbot-send:active {
+            transform: scale(0.98);
+        }
+
+        /* Flecha en el botón de enviar */
+        #chatbot-send::after {
+            content: "➤";
+            position: absolute;
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        /* Contenedor del icono flotante */
+        #chatbot-icon-container {
+            position: fixed;
+            bottom: 25px;
+            right: 25px;
+            z-index: 1001;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Oculta el icono cuando el chat está abierto */
+        #chatbot-icon-container.chat-open #chatbot-icon {
+            display: none;
+        }
+
+        /* Texto "¡Interactúa con LinkBot!" */
+        #chatbot-icon-text {
+            background: linear-gradient(135deg, var(--primary-gradient-start), var(--primary-gradient-end));
+            color: var(--text-light); /* Cambiado a texto claro */
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            opacity: 0;
+            transform: translateX(10px);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+            white-space: nowrap;
+            position: absolute;
+            right: 70px;
+            pointer-events: none;
+        }
+
+        /* Muestra el texto al pasar el ratón (si el chat no está abierto) */
+        #chatbot-icon-container:not(.chat-open):hover #chatbot-icon-text {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        /* Oculta el texto al abrir el chat */
+        #chatbot-icon-container.chat-open #chatbot-icon-text {
+            opacity: 0;
+            display: none;
+        }
+
+        /* Icono flotante del chatbot */
+        #chatbot-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, var(--primary-gradient-start), var(--primary-gradient-end)); /* Degradado azul/morado */
+            outline: none;
+            -webkit-tap-highlight-color: transparent;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            box-shadow: 0 6px 20px rgba(60, 119, 252, 0.3);
+            transition: all 0.3s ease;
+            animation: pulse 2s infinite; /* Usa la animación de sombra */
+            position: relative;
+        }
+
+        #chatbot-icon:hover {
+            background: linear-gradient(135deg, var(--primary-gradient-end), #5C35D0);
+            transform: scale(1.1);
+            box-shadow: 0 8px 25px rgba(60, 119, 252, 0.4);
+        }
+
+        /* SVG del robot (visible por defecto) */
+        #chatbot-icon #robot-svg-icon {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            transform: translateY(0);
+            /* filter: none; Eliminado el filtro para que el icono mantenga su color original */
+        }
+
+        /* Notificación (insignia) */
+        #chatbot-notification {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background-color: #ff4757; /* Mantenido el rojo para la notificación */
+            color: var(--text-light);
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            opacity: 0;
+            transform: scale(0.5);
+            transition: all 0.3s ease-out;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        #chatbot-notification.show {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        /* Clase de utilidad para ocultar elementos */
+        .hidden {
+            display: none !important;
+        }
+
+        /* Animación de pulso (para la sombra) */
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(60, 119, 252, 0.7); } /* Usando primary-gradient-start */
+            70% { box-shadow: 0 0 0 12px rgba(60, 119, 252, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(60, 119, 252, 0); }
+        }
+
+        /* Estilos para los botones de opciones (submenu) */
+        .options-container {
+            margin-top: 8px;
+            display: flex;
+            flex-direction: column; /* Cambiado a columna para que los botones aparezcan uno debajo del otro */
+            gap: 5px;
+        }
+
+        .option-button {
+            background: linear-gradient(135deg, var(--primary-gradient-start), var(--primary-gradient-end));
+            color: var(--text-light); /* Cambiado a texto claro */
+            border: none;
+            padding: 8px 12px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background-color 0.2s ease, transform 0.2s ease, border 0.2s ease; /* Añadir border a la transición */
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            width: fit-content;
+            align-self: flex-start;
+        }
+
+        .option-button:hover {
+            background: linear-gradient(135deg, var(--primary-gradient-end), #5C35D0);
+            transform: translateY(-1px);
+        }
+
+        .option-button:active {
+            transform: translateY(0);
+        }
+
+        /* NUEVOS ESTILOS PARA BOTONES DE RETORNO */
+        .option-button.return-button {
+            background: var(--return-button-bg);
+            color: var(--return-button-text);
+            border: var(--return-button-border);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); /* Sombra más sutil */
+        }
+
+        .option-button.return-button:hover {
+            background: var(--return-button-hover-bg);
+            color: var(--return-button-text);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+        }
+
+        .option-button.return-button:active {
+            transform: translateY(0);
+        }
+
+        /* Nuevo estilo para contenedores de botones de acción */
+        .action-button-container {
+            margin-top: 10px;
+            margin-bottom: 8px;
+            display: flex;
+            flex-direction: column; /* Cambiado a columna para que los botones aparezcan uno debajo del otro */
+            gap: 8px;
+            justify-content: flex-start;
+        }
+
+        /* Estilos para los botones de acción (descargar/comprar) */
+        .action-button {
+            background-color: var(--tertiary-color);
+            color: var(--text-light);
+            border: none;
+            padding: 8px 12px; /* Reducido el padding */
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 13px; /* Reducido el tamaño de la fuente */
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+            transition: all 0.2s ease;
+            transform: scale(1);
+            width: fit-content; /* Asegura que el botón no ocupe todo el ancho */
+            align-self: flex-start; /* Alinea a la izquierda */
+        }
+
+        .action-button:hover {
+            background-color: #27AE60;
+            transform: translateY(-2px) scale(1.03);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .action-button:active {
+            transform: translateY(0) scale(0.98);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Color específico para botón de comprar (ahora negro) */
+        .action-button.buy {
+            background-color: var(--buy-button-bg);
+            color: var(--buy-button-text);
+        }
+
+        .action-button.buy:hover {
+            background-color: var(--buy-button-hover-bg);
+            color: var(--buy-button-text);
+        }
+
+        /* Color específico para botón de descarga (verde) */
+        .action-button.download {
+            background-color: var(--tertiary-color);
+        }
+        .action-button.download:hover {
+            background-color: #27AE60;
+        }
+
+        /* Color específico para botón de WhatsApp (verde WhatsApp) */
+        .action-button.whatsapp {
+            background-color: #25D366;
+        }
+        .action-button.whatsapp:hover {
+            background-color: #1DA851;
+        }
+
+        /* Color específico para botón de formulario/solicitar (azul claro) */
+        .action-button.form, .action-button.request {
+            background-color: var(--quaternary-color); /* Ahora usará el nuevo color */
+            color: var(--text-light);
+        }
+        .action-button.form:hover, .action-button.request:hover {
+            background-color: #224D80; /* Un tono más oscuro para el hover del nuevo color */
+        }
+
+        /* Color específico para botón de dirección/mapa (rojo Google Maps) */
+        .action-button.direction {
+            background-color: #EA4335;
+        }
+        .action-button.direction:hover {
+            background-color: #C5221F;
+        }
+
+        /* Media queries para móvil */
+        @media (max-width: 768px) {
+            /* Prevent tap highlight on mobile */
+            * {
+                -webkit-tap-highlight-color: transparent;
+            }
+            #chatbot-icon-container {
+                bottom: 20px;
+                right: 20px;
+            }
+
+            #chatbot-icon {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            #chatbot-header .header-bot-icon-svg {
+                display: block;
+                height: 32px;
+                width: 32px;
+                object-fit: contain;
+                transform: translateY(-2px);
+                /* filter: none; Eliminado el filtro */
+            }
+
+            #chatbot-container {
+                width: 320px;
+                height: 480px;
+            }
+
+            .message {
+                font-size: 15px;
+            }
+
+            #chatbot-icon-text {
+                font-size: 14px;
+                padding: 8px 15px;
+                right: 70px;
+                transition: opacity 0.5s ease, transform 0.5s ease;
+            }
+
+            .mobile-text-initial-show {
+                opacity: 1;
+                transform: translateX(0);
+                animation: slideInLeft 0.5s forwards;
+            }
+
+            @keyframes slideInLeft {
+                from { opacity: 0; transform: translateX(-100px); }
+                to { opacity: 1; transform: translateX(0); }
+            }
+
+            @keyframes slideOutLeft {
+                from { opacity: 1; transform: translateX(0); }
+                to { opacity: 0; transform: translateX(-100px); }
+            }
+
+            .mobile-text-initial-hide {
+                animation: slideOutLeft 0.5s forwards;
+            }
+
+            #chatbot-icon-container.chat-open #chatbot-icon-text {
+                opacity: 0;
+                display: none;
+            }
+
+            #chatbot-icon {
+                background: linear-gradient(135deg, var(--primary-gradient-start), var(--primary-gradient-end));
+                outline: none;
+                -webkit-tap-highlight-color: transparent;
+            }
+
+            #chatbot-icon #robot-svg-icon {
+                display: block;
+                width: 35px; /* Tamaño más pequeño */
+                height: 35px;
+                object-fit: contain;
+                transform: translateY(-3px);
+                padding: 0;
+                box-sizing: border-box;
+                /* filter: none; Eliminado el filtro */
+            }
+
+            .option-button {
+                white-space: normal;
+                text-align: center;
+                min-width: 120px;
+                max-width: 100%;
+                color: var(--text-light); /* Asegura que el texto sea claro en móvil también */
+                font-weight: bold;
+            }
+
+            .option-button.return-button {
+                color: var(--return-button-text); /* Asegura el color del texto en móvil */
+                font-weight: bold;
+            }
+
+            .action-button {
+                white-space: normal;
+                text-align: center;
+                min-width: 120px;
+                max-width: 100%;
+                color: var(--text-light); /* Asegura que el texto sea claro en móvil también */
+                font-weight: bold;
+            }
+        }
+    </style>
+</head>
+<body style="margin:0; padding:0; overflow:hidden; background:transparent;">
+    <div id="chatbot-icon-container" role="region" aria-label="Chatbot minimizado">
+        <span id="chatbot-icon-text" aria-hidden="true">¡Interactúa con LinkBot!</span>
+        <div id="chatbot-icon" role="button" aria-label="Abrir Chatbot">
+            <img id="robot-svg-icon" src="https://d1yei2z3i6k35z.cloudfront.net/12156720/68617fe39fff6_LinkbotICONO2025.png" alt="LinkBot Icono">
+            <div id="chatbot-notification" class="hidden" aria-live="polite" aria-atomic="true">1</div>
+        </div>
+    </div>
+
+    <div id="chatbot-container" role="dialog" aria-labelledby="chatbot-header-title" aria-hidden="true">
+        <div id="chatbot-header">
+            <div class="header-title-group">
+                <img class="header-bot-icon-svg" src="https://d1yei2z3i6k35z.cloudfront.net/12156720/68617fe39fff6_LinkbotICONO2025.png" alt="LinkBot Icono">
+                <span id="chatbot-header-title">LinkBot</span>
+                <span id="online-dot" class="online-indicator hidden" aria-label="Estado en línea"></span>
+            </div>
+            <button id="chatbot-close" aria-label="Cerrar Chatbot">×</button>
+        </div>
+        <div id="chatbot-messages" role="log" aria-live="polite">
+        </div>
+        <div id="chatbot-input-container">
+            <input type="text" id="chatbot-input-field" placeholder="Escribe tu mensaje..." aria-label="Escribe tu mensaje">
+            <button type="button" id="chatbot-send" aria-label="Enviar mensaje"></button>
+        </div>
+    </div>
+
+    <script>
+        // =============================================
+        // VARIABLES GLOBALES
+        // =============================================
+        let currentSessionMessages = [];
+        let notificationTimer;
+        const NOTIFICATION_DELAY = 20000; // 20 segundos
+        let notificationShownOnce = false; // Controla si la notificación ya se mostró una vez
+        let chatbotOpenedOnce = false; // Nueva bandera para registrar si el chatbot se ha abierto al menos una vez
+        let initialMobileTextShown = false; // Controla si el texto inicial del icono móvil ya se mostró
+
+        // =============================================
+        // ELEMENTOS DEL DOM
+        // =============================================
+        const chatbotIconContainer = document.getElementById('chatbot-icon-container');
+        const chatbotIcon = document.getElementById('chatbot-icon');
+        const chatbotIconText = document.getElementById('chatbot-icon-text');
+        const chatbotContainer = document.getElementById('chatbot-container');
+        const chatbotClose = document.getElementById('chatbot-close');
+        const chatbotInput = document.getElementById('chatbot-input-field');
+        const chatbotSend = document.getElementById('chatbot-send');
+        const chatbotMessages = document.getElementById('chatbot-messages');
+        const notificationBadge = document.getElementById('chatbot-notification');
+        const onlineDot = document.getElementById('online-dot');
+        const bodyElement = document.body; // Referencia al elemento body
+
+        // =============================================
+        // FUNCIONES UTILITARIAS
+        // =============================================
+        function getCurrentTime() {
+            const now = new Date();
+            return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function showNotification() {
+            // Modificación: La notificación solo se muestra si el chatbot NO se ha abierto antes
+            if (!chatbotOpenedOnce && !notificationShownOnce) {
+                notificationBadge.classList.remove('hidden');
+                notificationBadge.classList.add('show');
+                notificationShownOnce = true; // Marca que la notificación ya se mostró
+            }
+        }
+
+        function hideNotification() {
+            notificationBadge.classList.remove('show');
+            setTimeout(() => {
+                notificationBadge.classList.add('hidden');
+            }, 300);
+        }
+
+        function startNotificationTimer() {
+            clearTimeout(notificationTimer);
+            // Modificación: Solo inicia el timer si la notificación no se ha mostrado antes Y el chatbot no se ha abierto antes
+            if (!notificationShownOnce && !chatbotOpenedOnce) {
+                notificationTimer = setTimeout(showNotification, NOTIFICATION_DELAY);
+            }
+        }
+        
+        // =============================================
+        // FUNCIONES DEL CHAT
+        // =============================================
+        function openChat() {
+            // Small timeout to prevent focus/scroll issues
+            setTimeout(() => {
+            chatbotContainer.classList.add('active');
+            chatbotContainer.setAttribute('aria-hidden', 'false');
+            chatbotIconContainer.classList.add('chat-open');
+            hideNotification();
+            clearTimeout(notificationTimer);
+            // Removed auto-focus to prevent keyboard popping up
+            onlineDot.classList.remove('hidden');
+            chatbotOpenedOnce = true; // Registrar que el chatbot se ha abierto
+            }, 50);
+
+            // Eliminar la clase que deshabilita los pointer-events del body
+            bodyElement.classList.remove('chatbot-closed-state');
+
+            // Asegura que el texto inicial móvil se oculte al abrir el chat
+            if (window.innerWidth <= 768) {
+                chatbotIconText.classList.add('hidden');
+                chatbotIconText.classList.remove('mobile-text-initial-show', 'mobile-text-initial-hide');
+            }
+
+            if (currentSessionMessages.length === 0) {
+                setTimeout(() => {
+                    const welcomeMessage = "👋 ¡Hola! Soy LinkBot, tu asistente virtual de Elite Marketing. Estoy aquí para ayudarte a hacer crecer tu negocio online. Selecciona una opción para comenzar:";
+                    
+                    addMessage(welcomeMessage, 'bot', [
+                        { text: "📈 Servicios de Marketing", value: "servicios_marketing" },
+                        { text: "🛒 Tienda de Servicios", value: "tienda_servicios" },
+                        { text: "🎓 Recursos Gratuitos", value: "recursos_gratis" },
+                        { text: "🧠 Asesoría Personalizada", value: "asesoria_personalizada" },
+                        { text: "📰 Casos de Éxito", value: "casos_exito" },
+                        { text: "📞 Contacto y Soporte", value: "contacto_soporte" }
+                    ]);
+                }, 500);
+            }
+        }
+
+        function closeChat() {
+            chatbotContainer.classList.remove('active');
+            chatbotContainer.setAttribute('aria-hidden', 'true');
+            chatbotIconContainer.classList.remove('chat-open');
+            onlineDot.classList.add('hidden');
+            startNotificationTimer(); // Reinicia el timer de notificación al cerrar el chat
+
+            // Añadir la clase que deshabilita los pointer-events al body
+            bodyElement.classList.add('chatbot-closed-state');
+        }
+
+        function addMessage(text, sender, options = [], actionButtons = []) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message', sender === 'bot' ? 'bot-message' : 'user-message');
+            messageElement.setAttribute('role', 'status'); // Para accesibilidad
+            messageElement.setAttribute('aria-live', 'polite'); // Para accesibilidad
+            
+            const time = getCurrentTime();
+            messageElement.innerHTML = `${text}<span class="message-time">${time}</span>`;
+
+            if (actionButtons.length > 0 && sender === 'bot') {
+                const actionButtonsContainer = document.createElement('div');
+                actionButtonsContainer.classList.add('action-button-container');
+                actionButtons.forEach(btn => {
+                    const anchor = document.createElement('a');
+                    anchor.classList.add('action-button');
+                    if (btn.type) anchor.classList.add(btn.type);
+                    anchor.href = btn.url;
+                    anchor.textContent = btn.text;
+                    anchor.target = "_blank";
+                    anchor.rel = "noopener noreferrer";
+                    anchor.setAttribute('role', 'button'); // Para accesibilidad
+                    actionButtonsContainer.appendChild(anchor);
+                });
+                messageElement.appendChild(actionButtonsContainer);
+            }
+
+            if (options.length > 0 && sender === 'bot') {
+                const optionsContainer = document.createElement('div');
+                optionsContainer.classList.add('options-container');
+                options.forEach(option => {
+                    const button = document.createElement('button');
+                    button.classList.add('option-button');
+                    button.textContent = option.text;
+                    button.dataset.value = option.value;
+                    // AÑADIR CLASE SI ES UN BOTÓN DE RETORNO
+                    if (option.isReturnButton) {
+                        button.classList.add('return-button'); 
+                    }
+                    button.addEventListener('click', (e) => handleOptionClick(option.value, e.target.textContent));
+                    button.setAttribute('role', 'option'); // Para accesibilidad
+                    optionsContainer.appendChild(button);
+                });
+                messageElement.appendChild(optionsContainer);
+            }
+
+            chatbotMessages.appendChild(messageElement);
+            // Scroll to bottom with smooth behavior
+            setTimeout(() => {
+                const lastMessage = chatbotMessages.lastElementChild;
+                lastMessage.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'nearest'
+                });
+            }, 50);
+            if (sender !== 'typing') {
+                 currentSessionMessages.push({ text, sender, time });
+            }
+        }
+        
+        function processUserMessage(message) {
+            const lowerMessage = message.toLowerCase();
+            // Palabras clave para respuestas instantáneas (sin "escribiendo...")
+            const instantKeywords = [
+                "start", "servicios_marketing", "tienda_servicios", "recursos_gratis",
+                "asesoria_personalizada", "casos_exito", "contacto_soporte",
+                "redes_sociales", "paginas_web", "email_marketing", "seo_sem", "ads", "branding",
+                "redes_gestion", "redes_diseno", "redes_ads",
+                "kit_marca_personal", "funnel_express", "ads_express",
+                "ebook_vender", "minicurso_funnels", "plantilla_contenido",
+                "agendar_sesion", "como_funciona_asesoria", "ver_tienda_completa",
+                "main_menu_options" // Añadido para que sea instantáneo
+            ];
+            
+            const isInstantResponse = instantKeywords.some(keyword => lowerMessage.includes(keyword));
+            
+            const shouldShowTyping = !isInstantResponse; // Mostrar "escribiendo" si NO es una respuesta instantánea
+            const responseDelay = isInstantResponse ? 100 : 1500; // Retraso corto para instantáneas, normal para otras
+
+            setTimeout(() => {
+                let typingIndicator;
+                if (shouldShowTyping) {
+                    typingIndicator = document.createElement('div');
+                    typingIndicator.id = 'typing-indicator';
+                    typingIndicator.classList.add('message', 'bot-message');
+                    typingIndicator.innerHTML = `LinkBot está escribiendo<span class="typing-animation"><span>.</span><span>.</span><span>.</span></span><span class="message-time">Ahora</span>`;
+                    typingIndicator.setAttribute('role', 'status');
+                    typingIndicator.setAttribute('aria-live', 'assertive');
+                    chatbotMessages.appendChild(typingIndicator);
+                    chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+                }
+        
+                setTimeout(() => {
+                    if (typingIndicator) typingIndicator.remove(); // Eliminar el indicador de escritura
+                    try {
+                        const botResponse = getBotResponse(message);
+                        if (typeof botResponse === 'object') {
+                            addMessage(botResponse.text, 'bot', botResponse.options, botResponse.actionButtons);
+                        } else {
+                            addMessage(botResponse, 'bot');
+                        }
+                    } catch (e) {
+                        console.error("Error al obtener la respuesta del bot:", e);
+                        addMessage("Lo siento, ocurrió un error y no puedo procesar tu solicitud. Por favor, intenta de nuevo.", 'bot');
+                    }
+                }, responseDelay);
+            }, 500); // Pequeño retraso inicial antes de procesar la respuesta
+        }
+
+        function handleOptionClick(value, buttonText) {
+            addMessage(buttonText, 'user');
+            // Eliminar todos los contenedores de opciones anteriores para evitar duplicados
+            const allOptionContainers = chatbotMessages.querySelectorAll('.options-container');
+            allOptionContainers.forEach(container => container.remove());
+            processUserMessage(value);
+            // Añadir un pequeño retraso para asegurar que el blur se procese después de otros eventos
+            setTimeout(() => {
+                chatbotInput.blur(); 
+            }, 50); // 50 milisegundos de retraso
+        }
+
+        function sendMessage() {
+            const message = chatbotInput.value.trim();
+            if (message) {
+                addMessage(message, 'user');
+                chatbotInput.value = '';
+                // Eliminar todos los contenedores de opciones anteriores al enviar un mensaje
+                const allOptionContainers = chatbotMessages.querySelectorAll('.options-container');
+                allOptionContainers.forEach(container => container.remove());
+                processUserMessage(message);
+                // Añadir un pequeño retraso para asegurar que el blur se procese después de otros eventos
+                setTimeout(() => {
+                    chatbotInput.blur(); 
+                }, 50); // 50 milisegundos de retraso
+            }
+        }
+
+        // Objeto para mapear respuestas del bot
+        const botResponses = {
+            "start": () => ({
+                text: `👋 ¡Hola! Soy LinkBot, tu asistente virtual de Elite Marketing. Estoy aquí para ayudarte a hacer crecer tu negocio online. Selecciona una opción para comenzar:`,
+                options: [
+                    { text: "📈 Servicios de Marketing", value: "servicios_marketing" },
+                    { text: "🛒 Tienda de Servicios", value: "tienda_servicios" },
+                    { text: "🎓 Recursos Gratuitos", value: "recursos_gratis" },
+                    { text: "🧠 Asesoría Personalizada", value: "asesoria_personalizada" },
+                    { text: "📰 Casos de Éxito", value: "casos_exito" },
+                    { text: "📞 Contacto y Soporte", value: "contacto_soporte" }
+                ]
+            }),
+            // NUEVA ENTRADA para el mensaje de "volver al menú principal"
+            "main_menu_options": () => ({
+                text: `Aquí tienes las opciones del menú principal:`,
+                options: [
+                    { text: "📈 Servicios de Marketing", value: "servicios_marketing" },
+                    { text: "🛒 Tienda de Servicios", value: "tienda_servicios" },
+                    { text: "🎓 Recursos Gratuitos", value: "recursos_gratis" },
+                    { text: "🧠 Asesoría Personalizada", value: "asesoria_personalizada" },
+                    { text: "📰 Casos de Éxito", value: "casos_exito" },
+                    { text: "📞 Contacto y Soporte", value: "contacto_soporte" }
+                ]
+            }),
+            "servicios_marketing": () => ({
+                text: `💼 Aquí encontrarás soluciones para hacer crecer tu marca y generar resultados reales con estrategias digitales:`,
+                options: [
+                    { text: "📱 Redes Sociales", value: "redes_sociales" },
+                    { text: "🖥️ Páginas Web y Funnels", value: "paginas_web" },
+                    { text: "📤 Email Marketing", value: "email_marketing" },
+                    { text: "🔎 SEO / SEM", value: "seo_sem" },
+                    { text: "🎯 Publicidad en Ads", value: "ads" },
+                    { text: "🧩 Branding y Diseño", value: "branding" },
+                    { text: "🔙 Volver al Menú Principal", value: "main_menu_options", isReturnButton: true } 
+                ]
+            }),
+            "redes_sociales": () => ({
+                text: `📲 Convierte tus redes sociales en un canal constante de ventas y posicionamiento con estrategias sólidas.`,
+                options: [
+                    { text: "📝 Gestión de Redes", value: "redes_gestion" },
+                    { text: "🎨 Diseño Creativo", value: "redes_diseno" },
+                    { text: "📣 Publicidad en Meta", value: "redes_ads" },
+                    { text: "🔙 Volver a Servicios", value: "servicios_marketing", isReturnButton: true }, 
+                    { text: "🔙 Volver al Menú Principal", value: "main_menu_options", isReturnButton: true } 
+                ]
+            }),
+            "redes_gestion": () => ({
+                text: `📅 Planificamos, redactamos y publicamos por ti, con enfoque estratégico y contenido de valor.`,
+                actionButtons: [
+                    { text: "📋 Ver Planes", url: "https://tuweb.com/servicios-redes-sociales", type: "form" },
+                    { text: "💬 Agendar Asesoría", url: "https://wa.me/503XXXXXXX", type: "whatsapp" }
+                ],
+                options: [
+                    { text: "🔙 Volver a Redes Sociales", value: "redes_sociales", isReturnButton: true },
+                    { text: "🔙 Volver al Menú Principal", value: "main_menu_options", isReturnButton: true }
+                ]
+            }),
+            "redes_diseno": () => ({
+                text: `🎨 Diseños atractivos, coherentes y pensados para captar la atención de tu público ideal.`,
+                actionButtons: [
+                    { text: "🖼️ Ver Portafolio", url: "https://tuweb.com/disenos", type: "form" },
+                    { text: "🛒 Comprar Diseño", url: "https://tuweb.com/comprar-diseno", type: "buy" }
+                ],
+                options: [
+                    { text: "🔙 Volver a Redes Sociales", value: "redes_sociales", isReturnButton: true },
+                    { text: "🔙 Volver al Menú Principal", value: "main_menu_options", isReturnButton: true }
+                ]
+            }),
+            "redes_ads": () => ({
+                text: `📢 Segmentamos tu público y lanzamos campañas para atraer clientes en Facebook e Instagram.`,
+                actionButtons: [
+                    { text: "📦 Ver Paquetes", url: "https://tuweb.com/meta-ads", type: "form" },
+                    { text: "📊 Ver Resultados", url: "https://tuweb.com/resultados", type: "form" }
+                ],
+                options: [
+                    { text: "🔙 Volver a Redes Sociales", value: "redes_sociales", isReturnButton: true },
+                    { text: "🔙 Volver al Menú Principal", value: "main_menu_options", isReturnButton: true }
+                ]
+            }),
+            "paginas_web": () => ({
+                text: `🌐 Creamos sitios profesionales y funnels automatizados diseñados para vender por ti.`,
+                actionButtons: [
+                    { text: "🌟 Ver Demos", url: "https://tuweb.com/webs", type: "form" },
+                    { text: "💰 Funnel desde $99", url: "https://tuweb.com/funnel", type: "buy" },
+                    { text: "🧾 Solicitar Presupuesto", url: "https://tuweb.com/presupuesto", type: "form" }
+                ],
+                options: [
+                    { text: "🔙 Volver a Servicios", value: "servicios_marketing", isReturnButton: true },
+                    { text: "🔙 Volver al Menú Principal", value: "main_menu_options", isReturnButton: true }
+                ]
+            }),
+            "email_marketing": () => ({
+                text: `📩 Automatiza tu seguimiento y conviértete en la primera opción en la mente del cliente.`,
+                actionButtons: [
+                    { text: "✉️ Ver Ejemplos", url: "https://tuweb.com/emails", type: "form" },
+                    { text: "📥 Solicitar Campaña", url: "https://tuweb.com/solicitar-campaña", type: "form" }
+                ],
+                options: [
+                    { text: "🔙 Volver a Servicios", value: "servicios_marketing", isReturnButton: true },
+                    { text: "🔙 Volver al Menú Principal", value: "main_menu_options", isReturnButton: true }
+                ]
+            }),
+            "seo_sem": () => ({
+                text: `🔍 Aparece en Google con estrategias de SEO y campañas pagas SEM que atraen tráfico calificado.`,
+                actionButtons: [
+                    { text: "📈 Ver Planes", url: "https://tuweb.com/seo", type: "form" },
+                    { text: "📊 Resultados Reales", url: "https://tuweb.com/resultados", type: "form" }
+                ],
+                options: [
+                    { text: "🔙 Volver a Servicios", value: "servicios_marketing", isReturnButton: true },
+                    { text: "🔙 Volver al Menú Principal", value: "main_menu_options", isReturnButton: true }
+                ]
+            }),
+            "ads": () => ({
+                text: `📢 Lanzamos anuncios rentables en Meta y Google Ads con segmentación y creatividad estratégica.`,
+                actionButtons: [
+                    { text: "💵 Comprar desde $69", url: "https://tuweb.com/ads", type: "buy" },
+                    { text: "📋 Estrategia Personalizada", url: "https://tuweb.com/estrategia-ads", type: "form" }
+                ],
+                options: [
+                    { text: "🔙 Volver a Servicios", value: "servicios_marketing", isReturnButton: true },
+                    { text: "🔙 Volver al Menú Principal", value: "main_menu_options", isReturnButton: true }
+                ]
+            }),
+            "branding": () => ({
+                text: `🎨 Tu identidad visual completa en un kit que comunica profesionalismo desde el primer vistazo.`,
+                actionButtons: [
+                    { text: "🎨 Ver Portafolio", url: "https://tuweb.com/branding", type: "form" },
+                    { text: "🧰 Comprar Kit de Marca", url: "https://tuweb.com/kit-marca", type: "buy" }
+                ],
+                options: [
+                    { text: "🔙 Volver a Servicios", value: "servicios_marketing", isReturnButton: true },
+                    { text: "🔙 Volver al Menú Principal", value: "main_menu_options", isReturnButton: true }
+                ]
+            }),
+            "tienda_servicios": () => ({
+                text: `🛍️ Accede a nuestros productos digitales listos para usar, sin esperas ni complicaciones.`,
+                options: [
+                    { text: "🚀 Kit de Marca Personal", value: "kit_marca_personal" },
+                    { text: "📈 Funnel Express", value: "funnel_express" },
+                    { text: "📢 Ads Express", value: "ads_express" },
+                    { text: "🛒 Ver Tienda Completa", value: "ver_tienda_completa" }, 
+                    { text: "🔙 Volver al Menú Principal", value: "main_menu_options", isReturnButton: true }
+                ]
+            }),
+            "ver_tienda_completa": () => ({ 
+                text: `¡Claro! Aquí puedes explorar nuestra tienda completa de servicios digitales. ¡Encuentra lo que necesitas para impulsar tu negocio!`,
+                actionButtons: [
+                    { text: "🛒 Ir a la Tienda", url: "https://tuweb.com/tienda", type: "buy" }
+                ],
+                options: [
+                    { text: "🔙 Volver a Tienda de Servicios", value: "tienda_servicios", isReturnButton: true },
+                    { text: "🔙 Volver al Menú Principal", value: "main_menu_options", isReturnButton: true }
+                ]
+            }),
+            "kit_marca_personal": () => ({
+                text: `🎯 El combo perfecto para presentarte como marca seria desde el día uno.`,
+                actionButtons: [
+                    { text: "📋 Ver Detalles", url: "https://tuweb.com/kit-marca", type: "form" },
+                    { text: "🛒 Comprar Ahora – $149", url: "https://tuweb.com/comprar-kit-marca", type: "buy" }
+                ],
+                options: [
+                    { text: "🔙 Volver a Tienda", value: "tienda_servicios", isReturnButton: true },
+                    { text: "🔙 Volver al Menú Principal", value: "main_menu_options", isReturnButton: true }
+                ]
+            }),
+            "funnel_express": () => ({
+                text: `🔁 Embudo de ventas con estructura lista para captar leads y vender desde el primer día.`,
+                actionButtons: [
+                    { text: "📋 Ver Detalles", url: "https://tuweb.com/funnel", type: "form" },
+                    { text: "🛒 Comprar Ahora – $99", url: "https://tuweb.com/comprar-funnel", type: "buy" }
+                ],
+                options: [
+                    { text: "🔙 Volver a Tienda", value: "tienda_servicios", isReturnButton: true },
+                    { text: "🔙 Volver al Menú Principal", value: "main_menu_options", isReturnButton: true }
+                ]
+            }),
+            "ads_express": () => ({
+                text: `📣 Pack de campañas preconfiguradas con diseño + segmentación + configuración.`,
+                actionButtons: [
+                    { text: "📋 Ver Detalles", url: "https://tuweb.com/ads", type: "form" },
+                    { text: "🛒 Comprar Ahora – $69", url: "https://tuweb.com/comprar-ads", type: "buy" }
+                ],
+                options: [
+                    { text: "🔙 Volver a Tienda", value: "tienda_servicios", isReturnButton: true },
+                    { text: "🔙 Volver al Menú Principal", value: "main_menu_options", isReturnButton: true }
+                ]
+            }),
+            "recursos_gratis": () => ({
+                text: `🎁 Accede a herramientas que te ayudarán a comenzar gratis y aprender sobre marketing digital.`,
+                options: [
+                    { text: "📘 Ebook “Cómo Vender”", value: "ebook_vender" },
+                    { text: "🎥 Minicurso Embudos", value: "minicurso_funnels" },
+                    { text: "📅 Plantilla de Contenido", value: "plantilla_contenido" },
+                    { text: "🔙 Volver al Menú Principal", value: "main_menu_options", isReturnButton: true }
+                ]
+            }),
+            "ebook_vender": () => ({
+                text: `📚 Técnicas simples para convertir más clientes sin sonar vendedor.`,
+                actionButtons: [
+                    { text: "📥 Descargar Ebook", url: "https://tuweb.com/ebook-vender", type: "download" }
+                ],
+                options: [
+                    { text: "🔙 Volver a Recursos", value: "recursos_gratis", isReturnButton: true },
+                    { text: "🔙 Volver al Menú Principal", value: "main_menu_options", isReturnButton: true }
+                ]
+            }),
+            "minicurso_funnels": () => ({
+                text: `🎓 Aprende cómo captar leads y cerrar ventas con un embudo bien diseñado.`,
+                actionButtons: [
+                    { text: "🎬 Ver Curso", url: "https://tuweb.com/curso-funnels", type: "form" }
+                ],
+                options: [
+                    { text: "🔙 Volver a Recursos", value: "recursos_gratis", isReturnButton: true },
+                    { text: "🔙 Volver al Menú Principal", value: "main_menu_options", isReturnButton: true }
+                ]
+            }),
+            "plantilla_contenido": () => ({
+                text: `🗓️ Organiza y planifica tu mes completo de publicaciones.`,
+                actionButtons: [
+                    { text: "📥 Descargar Plantilla", url: "https://tuweb.com/calendario", type: "download" }
+                ],
+                options: [
+                    { text: "🔙 Volver a Recursos", value: "recursos_gratis", isReturnButton: true },
+                    { text: "🔙 Volver al Menú Principal", value: "main_menu_options", isReturnButton: true }
+                ]
+            }),
+            "asesoria_personalizada": () => ({
+                text: `📞 Agenda una sesión personalizada con nuestros expertos en marketing digital.`,
+                options: [
+                    { text: "📅 Agendar Sesión", value: "agendar_sesion" },
+                    { text: "🎥 Ver Cómo Funciona", value: "como_funciona_asesoria" },
+                    { text: "🔙 Volver al Menú Principal", value: "main_menu_options", isReturnButton: true }
+                ]
+            }),
+            "agendar_sesion": () => ({
+                text: `📆 Define tus metas y recibe orientación 1 a 1 para lograrlas.`,
+                actionButtons: [
+                    { text: "📅 Seleccionar Fecha", url: "https://tuweb.com/agendar", type: "request" }
+                ],
+                options: [
+                    { text: "🔙 Volver a Asesoría", value: "asesoria_personalizada", isReturnButton: true },
+                    { text: "🔙 Volver al Menú Principal", value: "main_menu_options", isReturnButton: true }
+                ]
+            }),
+            "como_funciona_asesoria": () => ({
+                text: `📽️ Video explicativo de cómo te guiamos paso a paso en la asesoría.`,
+                actionButtons: [
+                    { text: "🎥 Ver Video", url: "https://tuweb.com/como-funciona-asesoria", type: "form" }
+                ],
+                options: [
+                    { text: "🔙 Volver a Asesoría", value: "asesoria_personalizada", isReturnButton: true },
+                    { text: "🔙 Volver al Menú Principal", value: "main_menu_options", isReturnButton: true }
+                ]
+            }),
+            "casos_exito": () => ({
+                text: `📊 Historias reales de clientes que lograron sus objetivos con nuestra ayuda.`,
+                actionButtons: [
+                    { text: "👗 Caso Moda Online", url: "https://tuweb.com/casos/moda", type: "form" },
+                    { text: "💄 Caso Cosméticos", url: "https://tuweb.com/casos/cosmeticos", type: "form" },
+                    { text: "🛠️ Caso Servicios", url: "https://tuweb.com/casos/servicios", type: "form" },
+                    { text: "📖 Ver Todos", url: "https://tuweb.com/casos", type: "form" }
+                ],
+                options: [
+                    { text: "🔙 Volver al Menú Principal", value: "main_menu_options", isReturnButton: true }
+                ]
+            }),
+            "contacto_soporte": () => ({
+                text: `📲 Elige tu canal de contacto preferido. Estamos aquí para ayudarte:`,
+                actionButtons: [
+                    { text: "📞 Llamar", url: "tel:+503XXXXXXX", type: "request" },
+                    { text: "💬 WhatsApp", url: "https://wa.me/503XXXXXXX", type: "whatsapp" },
+                    { text: "📧 Correo", url: "mailto:info@tuagencia.com", type: "form" },
+                    { text: "📍 Ubicación", url: "https://maps.google.com", type: "direction" }
+                ],
+                options: [
+                    { text: "🔙 Volver al Menú Principal", value: "main_menu_options", isReturnButton: true }
+                ]
+            }),
+            "gracias": () => ({
+                text: `De nada. Estoy para ayudarte. ¿Hay algo más en lo que pueda asistirte?`,
+                options: [{ text: "🔙 Ir al Menú Principal", value: "main_menu_options", isReturnButton: true }]
+            })
+        };
+
+        function getBotResponse(userMessage) {
+            const lowerMessage = userMessage.toLowerCase();
+            const isMobile = window.innerWidth <= 768; 
+
+            // Mapeo de palabras clave a funciones de respuesta
+            const responseFunction = botResponses[lowerMessage];
+
+            if (responseFunction) {
+                return responseFunction(); 
+            } else if (lowerMessage.includes("gracias") || lowerMessage.includes("muchas gracias") || lowerMessage.includes("ok") || lowerMessage.includes("perfecto")) {
+                return botResponses["gracias"]();
+            }
+            
+            // Respuesta por defecto
+            return {
+                text: `Parece que no te he entendido. Por favor, selecciona una de las opciones del menú principal para continuar.`,
+                options: [{ text: "🔙 Ir al Menú Principal", value: "main_menu_options", isReturnButton: true }]
+            };
+        }
+
+        // =============================================
+        // EVENT LISTENERS
+        // =============================================
+        chatbotIcon.addEventListener('click', openChat);
+        chatbotClose.addEventListener('click', closeChat);
+        chatbotSend.addEventListener('click', sendMessage);
+        chatbotInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Al cargar la página, el body debe estar en estado "chatbot cerrado"
+            bodyElement.classList.add('chatbot-closed-state');
+            startNotificationTimer();
+
+            // Lógica para el texto inicial en móvil
+            if (window.innerWidth <= 768) {
+                const showText = () => {
+                    // Solo muestra el texto si el chatbot no está activo y no se ha mostrado antes
+                    if (!chatbotContainer.classList.contains('active') && !initialMobileTextShown) {
+                        chatbotIconText.classList.add('mobile-text-initial-show');
+                        chatbotIconText.classList.remove('mobile-text-initial-hide', 'hidden');
+                    }
+                };
+                const hideText = () => {
+                    // Solo oculta el texto si el chatbot no está activo y no se ha mostrado antes
+                    if (!chatbotContainer.classList.contains('active') && !initialMobileTextShown) {
+                        chatbotIconText.classList.add('mobile-text-initial-hide');
+                        chatbotIconText.classList.remove('mobile-text-initial-show');
+                        setTimeout(() => {
+                            chatbotIconText.classList.add('hidden');
+                            initialMobileTextShown = true; // Marca que ya se mostró y ocultó
+                        }, 500); // Ocultar completamente después de la animación
+                    }
+                };
+
+                // Inicia el ciclo de mostrar y ocultar
+                setTimeout(showText, 2000);
+                setTimeout(hideText, 7000);
+            }
+        });
+    </script>
+</body>
+</html>
